@@ -1,0 +1,115 @@
+# AgentFlow 工作流配置 v4
+# 产物注册表 + 节点产物验收模式（auto / manual / ai_judge）
+# 配置优先级：global default < workflow < repo < task override
+# 任务启动时冻结 config_snapshot；运行中变更需新版本并审计。
+
+workflow: requirement_to_pr_review_loop
+version: 4
+
+defaults:
+  artifact_acceptance:
+    mode: auto
+    on_fail: retry_same_node
+
+artifacts:
+
+  requirement_baseline:        # S1 需求分析
+    node: S1
+    schema: schemas/requirement_baseline.json
+    acceptance: { mode: auto, on_fail: S1 }
+
+  tech_doc:                    # S2 技术文档
+    node: S2
+    schema: schemas/tech_doc.json
+    acceptance: { mode: auto, on_fail: S2 }
+
+  doc_self_review:             # S3 文档自审
+    node: S3
+    schema: schemas/self_review.json
+    acceptance:
+      mode: ai_judge
+      rubric: rubrics/doc_self_review.md
+      threshold: 0.85
+      on_fail: S2
+      escalate_on_low_confidence: false
+
+  tech_doc_approval:           # S4 人工审文档（唯一默认人工闸门）
+    node: S4
+    schema: schemas/approval.json
+    acceptance:
+      mode: manual
+      approvers: ["@Neo"]
+      notify: slack
+      sla: 24h
+      on_reject: S1
+      require_artifact: [tech_doc, doc_self_review]
+
+  code_change:                 # S5 编码
+    node: S5
+    acceptance: { mode: auto, checks: [build, unit_test], on_fail: S5 }
+
+  code_self_review:            # S6 代码自审
+    node: S6
+    schema: schemas/code_review.json
+    acceptance:
+      mode: ai_judge
+      rubric: rubrics/code_review.md
+      threshold: 0.85
+      on_fail: S5
+      escalate_on_low_confidence: false
+
+  pr_registration:             # S7 建 PR + Slack 登记
+    node: S7
+    acceptance:
+      mode: auto
+      checks: [pr_created, slack_thread_registered]
+      on_fail: S7
+
+  review_snapshot:             # S8 监听 Review
+    node: S8
+    acceptance: { mode: auto }
+
+  reminder_record:             # S8R 无 comment 提醒
+    node: S8R
+    acceptance: { mode: auto, cooldown: 30m, max_reminders: 3 }
+
+  comment_classification:      # S9 评论分类
+    node: S9
+    schema: schemas/comment_classification.json
+    acceptance:
+      mode: ai_judge
+      rubric: rubrics/comment_classification.md
+      threshold: 0.80
+      on_fail: S9
+      escalate_on_low_confidence: false
+
+  update_record:               # S10 修改+回复+Slack
+    node: S10
+    acceptance:
+      mode: auto
+      checks: [commit_pushed, comments_replied, slack_sent]
+      on_fail: S10
+
+  final_check_report:          # S11 最终检查
+    node: S11
+    acceptance:
+      mode: auto
+      checks: [pr_approved, must_fix_resolved, ci_passed_or_recorded]
+
+  completion_notice:           # S12 通知手动 merge
+    node: S12
+    acceptance: { mode: auto }
+
+  audit_archive:               # S13 归档
+    node: S13
+    acceptance: { mode: auto }
+
+# 固定安全策略（不可配置为自动 merge）
+merge_policy:
+  human_required: true
+  auto_merge: false
+  forbidden_actions:
+    - merge_pull_request
+    - enable_auto_merge
+    - push_to_main
+    - force_push
