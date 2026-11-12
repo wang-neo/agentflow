@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.agentflow.slack-daemon</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/mac/.workbuddy/binaries/node/versions/22.22.2-6/bin/node</string>
+    <string>/Users/mac/.agentflow/daemon/slack-daemon.js</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>/Users/mac/.agentflow/daemon/launchd.out.log</string>
+  <key>StandardErrorPath</key><string>/Users/mac/.agentflow/daemon/launchd.err.log</string>
+</dict>
+</plist>
