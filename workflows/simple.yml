@@ -1,0 +1,88 @@
+# simple — 一把梭哈全流程（零人工）
+# 用途：小改动、演示、个人项目。全程自动：需求 → 方案 → 编码 → 自审 → PR → 通知。
+# 唯一保留的人工动作：merge（铁律，任何 workflow 不可关闭）。
+
+workflow: simple_full_auto
+version: 1
+description: 全自动交付，无人工审批节点，AI 双审兜底质量
+
+defaults:
+  artifact_acceptance:
+    mode: auto
+    on_fail: retry_same_node
+
+artifacts:
+
+  requirement_baseline:        # S1
+    node: S1
+    schema: schemas/requirement_baseline.json
+    acceptance: { mode: auto, on_fail: S1 }
+
+  tech_doc:                    # S2（simple 仍产方案，只是不等人）
+    node: S2
+    schema: schemas/tech_doc.json
+    acceptance: { mode: auto, on_fail: S2 }
+
+  doc_self_review:             # S3：AI 审兜底
+    node: S3
+    schema: schemas/self_review.json
+    acceptance:
+      mode: ai_judge
+      rubric: rubrics/doc_self_review.md
+      threshold: 0.85
+      on_fail: S2
+      max_loops: 3            # 3 轮不过 → 直接失败并报告（simple 不转人工，任务失败即止）
+      on_max_loops: fail_task
+
+  tech_doc_approval:           # S4：跳过
+    node: S4
+    skip: true
+
+  code_change:                 # S5
+    node: S5
+    acceptance: { mode: auto, checks: [build, unit_test], on_fail: S5 }
+
+  code_self_review:            # S6：AI 审兜底
+    node: S6
+    schema: schemas/code_review.json
+    acceptance:
+      mode: ai_judge
+      rubric: rubrics/code_review.md
+      threshold: 0.85
+      on_fail: S5
+      max_loops: 3
+      on_max_loops: fail_task
+
+  pr_registration:             # S7
+    node: S7
+    acceptance: { mode: auto, checks: [pr_created], on_fail: S7 }
+
+  review_snapshot:             # S8
+    node: S8
+    acceptance: { mode: auto }
+
+  comment_classification:      # S9
+    node: S9
+    schema: schemas/comment_classification.json
+    acceptance:
+      mode: ai_judge
+      rubric: rubrics/comment_classification.md
+      threshold: 0.80
+      on_fail: S9
+
+  update_record:               # S10
+    node: S10
+    acceptance: { mode: auto, checks: [commit_pushed, comments_replied], on_fail: S10 }
+
+  final_check_report:          # S11
+    node: S11
+    acceptance: { mode: auto, checks: [pr_approved_or_no_reviewers] }
+
+  completion_notice:           # S12
+    node: S12
+    acceptance: { mode: auto }
+
+merge_policy:
+  human_required: true
+  auto_merge: false
+  forbidden_actions: [merge_pull_request, enable_auto_merge, push_to_main, force_push]

@@ -1,0 +1,125 @@
+# katana — 团队协作流程（Slack 深度集成）
+# 面向 katana-server 团队仓库：PR 建好后主动 @ 审核人；review 闭环全程 Slack 通知。
+# 前置：slack.notify 配置需要真实 webhook（当前占位实现，接入后自动生效）。
+
+workflow: katana_team_review
+version: 1
+description: 团队流程：方案人审 + PR 建好 @ 审核人 + review 闭环 Slack 全通知
+
+defaults:
+  artifact_acceptance:
+    mode: auto
+    on_fail: retry_same_node
+
+# ---- Slack 集成（katana 专属）----
+slack:
+  channel: "#katana-review"        # 目标频道（占位，接入时确认）
+  mention:
+    on_pr_created: ["@reviewer-team"]     # S7 建 PR 后 @ 这些人去 review
+    on_update: ["@//neo/"]                # S10 每轮修复后 @ 提醒
+    on_approved: ["@//neo/"]              # approve 后 @ 发起人去 merge
+    on_no_comment_hours: 2                # 超时提醒
+  messages:
+    pr_created: "🔔 新 PR 待审核：{pr_url} — {title}\n需求：{requirement_summary}\n方案：{plan_summary}\n请 review 并留 comment；approve 后由 {owner} 手动 merge。"
+    updated: "@//neo/ updated: {changes_summary}（PR：{pr_url}）"
+    no_comment: "@reviewer-team PR {pr_url} 已 {hours}h 无 review comment，需要重新审核"
+    approved: "✅ {pr_url} 已 approve，@{owner} 请手动 merge"
+
+artifacts:
+
+  requirement_baseline:        # S1
+    node: S1
+    schema: schemas/requirement_baseline.json
+    acceptance: { mode: auto, on_fail: S1 }
+
+  tech_doc:                    # S2
+    node: S2
+    schema: schemas/tech_doc.json
+    acceptance: { mode: auto, on_fail: S2 }
+
+  doc_self_review:             # S3
+    node: S3
+    schema: schemas/self_review.json
+    acceptance:
+      mode: ai_judge
+      rubric: rubrics/doc_self_review.md
+      threshold: 0.85
+      on_fail: S2
+      max_loops: 3
+      on_max_loops: escalate_manual    # katana：AI 撞墙转人工，不失败
+
+  tech_doc_approval:           # S4：manual（团队流程保留人审）
+    node: S4
+    schema: schemas/approval.json
+    acceptance:
+      mode: manual
+      approvers: ["@Neo"]
+      notify: slack                     # 审批请求也发 Slack（含产物路径）
+      sla: 24h
+      on_reject: S1
+      require_artifact: [tech_doc, doc_self_review]
+
+  code_change:                 # S5
+    node: S5
+    acceptance: { mode: auto, checks: [build, unit_test], on_fail: S5 }
+
+  code_self_review:            # S6
+    node: S6
+    schema: schemas/code_review.json
+    acceptance:
+      mode: ai_judge
+      rubric: rubrics/code_review.md
+      threshold: 0.85
+      on_fail: S5
+      max_loops: 3
+      on_max_loops: escalate_manual
+
+  pr_registration:             # S7：建 PR 后必须发 Slack @ 审核人（katana 核心）
+    node: S7
+    acceptance:
+      mode: auto
+      checks: [pr_created, slack_mention_sent]   # @ 审核人消息发送成功才算过
+      on_fail: S7
+
+  review_snapshot:             # S8
+    node: S8
+    acceptance: { mode: auto }
+
+  reminder_record:             # S8R：无 comment 提醒（katana 收紧到 2h/5 次）
+    node: S8R
+    acceptance: { mode: auto, cooldown: 2h, max_reminders: 5 }
+
+  comment_classification:      # S9
+    node: S9
+    schema: schemas/comment_classification.json
+    acceptance:
+      mode: ai_judge
+      rubric: rubrics/comment_classification.md
+      threshold: 0.80
+      on_fail: S9
+
+  update_record:               # S10：修复后 Slack @ 提醒
+    node: S10
+    acceptance:
+      mode: auto
+      checks: [commit_pushed, comments_replied, slack_updated_sent]
+      on_fail: S10
+
+  final_check_report:          # S11
+    node: S11
+    acceptance: { mode: auto, checks: [pr_approved, must_fix_resolved] }
+
+  completion_notice:           # S12：approve 后 Slack @ owner 手动 merge
+    node: S12
+    acceptance:
+      mode: auto
+      checks: [slack_approved_sent]
+
+  audit_archive:               # S13
+    node: S13
+    acceptance: { mode: auto }
+
+merge_policy:
+  human_required: true
+  auto_merge: false
+  forbidden_actions: [merge_pull_request, enable_auto_merge, push_to_main, force_push]
