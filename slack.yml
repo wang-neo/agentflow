@@ -1,35 +1,50 @@
-# Slack 集成配置
-# 真实发送：环境变量 SLACK_WEBHOOK_URL（Incoming Webhook URL）
-# 未设置时自动降级为占位模式（聊天输出 + docs/slack-log.md 留痕），流程不中断。
+# Slack 集成配置（Slack App · 以用户身份发送）
+# 目标：消息以使用者本人（Neo）的名义发出——头像/名字都是本人，像亲手发的一样。
+#
+# 前置（一次性，需要你在 Slack App 管理页操作）：
+# 1. api.slack.com/apps → 你的 App → OAuth & Permissions
+# 2. User Token Scopes 添加: chat:write（以用户发消息）
+#    （若要 @mention 生效还需 users:read.email，把邮箱映射成 <@Uxxxx> user_id）
+# 3. Install to Workspace → 得到 User OAuth Token（xoxp- 开头）
+# 4. 把 App 加进目标频道（/invite @App名）
+#
+# 运行时配置（secret 不入库）：
+#   export SLACK_USER_TOKEN=xoxp-xxxx        # 用户令牌
+#   export SLACK_CHANNEL_ID=C0123ABCDEF      # 目标频道 ID（右键频道→查看频道详情）
+# 可写入 ~/.agentflow/.env（gitignore 保护），协调者启动时读取。
 
 slack:
-  # 默认频道（webhook 本身绑定了频道时此值仅用于留痕记录）
-  default_channel: "#katana-review"
+  mode: slack_app_user_token      # 以用户身份发送（非 webhook）
+  auth:
+    token_env: SLACK_USER_TOKEN  # xoxp-...
+    channel_env: SLACK_CHANNEL_ID
+    env_file: ~/.agentflow/.env  # 可选：KEY=VALUE 每行一条，存在则先加载
+  identity:
+    as_user: true                # chat.postMessage 的 as_user=true → 以 token 主人身份
 
-  # webhook 地址不入库（secret），从环境变量读：
-  #   export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T000/B000/XXXX
-  # 协调者启动时检查该变量：有 → 真发送；无 → 占位并在就绪简报中提示。
+  # mention 解析：yml 里的 @名字 → 查 user_id → <@Uxxxx>（真 @，有通知）
+  mention_resolution: users_lookup_by_email   # 需要 users:read.email scope
 
-  # 消息模板（{var} 占位符由协调者填充）
   templates:
     pr_created: |
       🔔 新 PR 待审核：{pr_url}
       需求：{requirement_summary}
       方案：{plan_summary}
-      {mention_on_pr_created} 请 review 并留 comment；approve 后由 {owner} 手动 merge。
+      {mentions} 请 review 并留 comment；approve 后由 {owner} 手动 merge。
     updated: |
-      {mention_on_update} updated: {changes_summary}（PR：{pr_url}）
+      {mentions} updated: {changes_summary}（PR：{pr_url}）
     no_comment: |
-      {mention_no_comment_list} PR {pr_url} 已 {hours}h 无 review comment，需要重新审核
+      {mentions} PR {pr_url} 已 {hours}h 无 review comment，需要重新审核
     approved: |
-      ✅ {pr_url} 已 approve，{mention_on_approved} 请手动 merge
+      ✅ {pr_url} 已 approve，{mentions} 请手动 merge
     s4_approval: |
       📝 方案待审批（{task_id}）：{plan_summary}
       产物：{artifacts_paths}
       请在 Orca 会话中回复「通过」/「打回：意见」
 
-  # 发送纪律
   rules:
-    - 每条消息发送前先写 docs/slack-log.md（时间/模板名/内容/结果）——留痕优先，发送失败不丢记录
-    - webhook 失败重试 1 次，仍失败降级占位并在聊天里警告
-    - 同一事件（同 PR 同类型）5 分钟内不重发（防抖）
+    - 发送前先写 docs/slack-log.md（时间/模板/内容/结果）——留痕优先，失败不丢
+    - chat.postMessage 失败重试 1 次；仍失败降级占位（聊天输出）并警告
+    - token/channel 未配置 → 占位模式，就绪简报提示缺什么
+    - 同一事件 5 分钟防抖
+    - slack-log.md 记录 ts（消息时间戳），便于后续 reply 线程化
