@@ -30,7 +30,16 @@ accepted 后下游才可消费；记录 consumed_artifact_version。
 - **S2 技术文档**（auto）：worker 产 tech_doc vN（最小方案+改动点+测试+回滚）
 - **S3 文档自审**（ai_judge, ~/.agentflow/rubrics/doc_self_review.md, 0.85）：Judge worker 只读评审；fail→回 S2 修订（vN+1）重走 S3，最多 3 轮后转 manual 问用户
 - **S4 人工审文档**（manual，唯一默认人工门）：把 tech_doc+doc_self_review 摘要给用户；
+  **审批卡格式（必须遵守）**——摘要之外必须附「产物路径清单」区块，逐项列出绝对路径，用户可直接点开/在编辑器打开：
+  ```
+  📂 产物位置
+  • 技术文档：<worktree绝对路径>/docs/tech/<文件名>
+  • 需求基线：<绝对路径>/docs/requirements/<文件名>
+  • 自审记录：<绝对路径>/docs/agentflow/...（如有）
+  ```
+  （列实际存在的文件； Judges 产物在 judge worktree 时给出其 worktree 路径）
   `通过[:附言]`→S5（附言并入）；`打回：要求`→按 on_reject 回 S1/S2 重走
+  同样规则适用于所有等用户的节点（S12 完成通知也列 PR URL+worktree+报告路径）
 - **S5 编码**（auto: build+unit_test）：worker 先写回归测试（红）再实现（绿），commit 不 push
 - **S6 代码自审**（ai_judge, ~/.agentflow/rubrics/code_review.md, 0.85）：Judge 只读 diff+测试；fail→回 S5，3 轮上限
 - **S7 建 PR+Slack 登记**（auto: pr_created+slack_thread_registered）：push 分支、gh pr create、发 Slack（当前占位：写 docs/slack-log.md 并在聊天输出 [SLACK-PLACEHOLDER] 消息文本，含 @//neo/ 提及），两者都成功才 accepted
