@@ -16,7 +16,7 @@
    - 存在中途任务（status != completed/failed/archived）→ **先恢复**：向用户报告「发现中断任务 <id>（停在 <节点>），继续 / 放弃 / 查看状态？」，等待指令；用户说继续则从记录的节点接续（产物哈希已记账，幂等键防重复判定）
    - 无中途任务 → 正常就绪
 2. **自注册**：把自己的 worktree 绝对路径写入 `~/.agentflow/.sentinel-state.json` 的 `coordinator` 字段（哨兵靠它找到你）
-3. 发就绪简报（确认：workflow 版本、S4 模式、merge 永远人工、Slack 模式[真实/占位]）
+3. 发就绪简报（确认：规则库版本[读 ~/.agentflow/CHANGELOG.md 最后 5 行]、workflow 版本、S4 模式、merge 永远人工、Slack 模式[真实/占位]）
 
 # 铁律（来自 workflow 的 merge_policy，不可协商）
 
@@ -34,6 +34,7 @@
    └─ skip     ：节点不执行、不产 artifact、直接进下一节点；记账记 {"event":"node_skipped","node":"S4"}
 accepted 后下游才可消费；记录 consumed_artifact_version。
 门决策幂等：同 (artifact_hash, mode, config_version) 只判一次。
+每个 gate 决策记账时附 config 版本号（读 ~/.agentflow/CHANGELOG.md 最新版本）与一行依据（引用 workflow 哪条配置/rubric 哪个维度）——用户问「这步为什么这么走」时可完整回放。
 ```
 
 **ai_judge 边界规则**：confidence 落在 [threshold-0.05, threshold) 的 pass 判定为「边界通过」——照常 accepted，但必须在记账 reasons 里附「边界判定说明」（哪些维度弱、为什么仍放行），后续审批卡如有需展示。
@@ -71,9 +72,32 @@ accepted 后下游才可消费；记录 consumed_artifact_version。
 - Slack 消息 → `docs/slack-log.md`（时间/模板/内容/ts/结果）
 - 恢复依据 = 这三个文件；崩溃后重启按「启动协议」走
 
-# 事件等待纪律
+# 事件等待纪律与状态可视化
 
 派 worker 或进 S8 监听 → 立即结束回合等唤醒，绝不轮询。哨兵消息 subject 含 "PR <N> <事件>"。
+
+**每次进入等待前，必须输出「状态三行」（用户扫一眼就知道轮到谁）**：
+```
+▶ 当前：S5 编码（worker dev 运行中，已 3 分钟）
+⏸ 下一步：S6 代码自审（自动）
+👤 你无需操作——下次需要你：S4 已过，直至 PR 通知
+```
+若在等用户：`👤 等你：S4 方案审批（回复 通过/打回：意见）`
+用户发「进度」→ 同样输出状态三行 + 各节点一行小结（节点/状态/耗时/产物路径）。
+
+# 失败汇报规范（任何人机交互节点失败时）
+
+worker escalation / 重试用尽 / 外部命令失败 → 向用户输出「失败卡片」（不许只报 error code）：
+```
+❌ S5 编码失败（第 2/3 次）
+原因（人话）：测试 health.test.js 连续红灯——dev worker 两次修复未通过
+原始错误：Node exited 1（详见 <evidence 路径>）
+出路（选一回复）：
+  1 再试一次（我重新派 worker 并附失败上下文）
+  2 跳过测试继续（本次例外，需你确认）
+  3 放弃任务（归档，保留全部记录）
+```
+原则：每次失败必须给「人话原因 + 证据路径 + 至少 2 条出路」；绝不让用户面对沉默或裸错误码。
 
 # 占位符规范（Slack 模板）
 
@@ -97,3 +121,10 @@ accepted 后下游才可消费；记录 consumed_artifact_version。
 
 ## 单一主线
 同一时间每个需求只有一条活动流水线；重复触发（用户重发、消息重投）一律归并到主线并在聊天里说明。
+
+## 多任务队列（v6.1）
+- **默认串行**：新需求到来时若有在途任务 → 登记 backlog（FIFO），当前任务到 S8（等 PR review）后才启动下一个（S8 是纯等待，不占资源）
+- **显式并行**：用户说「并行：xxx」→ 同时开跑（不同 worktree 天然隔离），每任务独立 workflow_state_<tid>.json
+- **任务短 ID**：每任务生成 4 位短 ID（如 `a3f2`），此后所有状态输出/S4 卡/Slack 消息带 `[a3f2]` 前缀——多任务并行时消息一眼归属
+- **`任务列表`**：输出队列全景（在途/排队/各在哪个节点/哪个等你），状态三行格式用于当前焦点任务
+- 审批与指令带前缀定向：`a3f2 通过` 只作用于该任务；不带前缀默认作用于当前焦点任务
