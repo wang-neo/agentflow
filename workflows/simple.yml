@@ -3,8 +3,8 @@
 # 唯一保留的人工动作：merge（铁律，任何 workflow 不可关闭）。
 
 workflow: simple_full_auto
-version: 1
-description: 全自动交付，无人工审批节点，AI 双审兜底质量
+version: 2
+description: 全自动交付，无常规人工审批；AI 双审兜底，撞墙（3轮不过）时最后问一次人
 
 defaults:
   artifact_acceptance:
@@ -31,8 +31,8 @@ artifacts:
       rubric: rubrics/doc_self_review.md
       threshold: 0.85
       on_fail: S2
-      max_loops: 3            # 3 轮不过 → 直接失败并报告（simple 不转人工，任务失败即止）
-      on_max_loops: fail_task
+      max_loops: 3            # 3 轮不过 → 失败前最后问一次人（用户可救活或确认失败）
+      on_max_loops: ask_human_last_resort
 
   tech_doc_approval:           # S4：跳过
     node: S4
@@ -51,7 +51,7 @@ artifacts:
       threshold: 0.85
       on_fail: S5
       max_loops: 3
-      on_max_loops: fail_task
+      on_max_loops: ask_human_last_resort
 
   pr_registration:             # S7
     node: S7

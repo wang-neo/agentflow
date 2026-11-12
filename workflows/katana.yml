@@ -3,17 +3,17 @@
 # 前置：slack.notify 配置需要真实 webhook（当前占位实现，接入后自动生效）。
 
 workflow: katana_team_review
-version: 1
-description: 团队流程：方案人审 + PR 建好 @ 审核人 + review 闭环 Slack 全通知
+version: 2
+description: 团队流程：方案人审（Slack 通知）+ PR @ 审核人 + review 闭环 Slack 全通知；真实发送依赖 SLACK_WEBHOOK_URL
 
 defaults:
   artifact_acceptance:
     mode: auto
     on_fail: retry_same_node
 
-# ---- Slack 集成（katana 专属）----
+# ---- Slack 集成：真实发送配置见 ~/.agentflow/slack.yml（SLACK_WEBHOOK_URL 环境变量）----
+# 本文件的 slack 段定义 katana 的提及策略；消息模板与发送纪律统一在 slack.yml
 slack:
-  channel: "#katana-review"        # 目标频道（占位，接入时确认）
   mention:
     on_pr_created: ["@reviewer-team"]     # S7 建 PR 后 @ 这些人去 review
     on_update: ["@//neo/"]                # S10 每轮修复后 @ 提醒
