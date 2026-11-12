@@ -42,9 +42,13 @@ slack:
       产物：{artifacts_paths}
       请在 Orca 会话中回复「通过」/「打回：意见」
 
+  # 哨兵失联升级：哨兵在 ~/.agentflow/.sentinel-state.json 的 coordinator 字段找不到协调者时，
+  # 用本配置直接把事件发到 Slack（no_comment 模板 + 事件详情），保证 PR 事件不丢
+  sentinel_escalation: true
+
   rules:
     - 发送前先写 docs/slack-log.md（时间/模板/内容/结果）——留痕优先，失败不丢
     - chat.postMessage 失败重试 1 次；仍失败降级占位（聊天输出）并警告
     - token/channel 未配置 → 占位模式，就绪简报提示缺什么
-    - 同一事件 5 分钟防抖
+    - 防抖窗口与哨兵巡检周期对齐：15 分钟（哨兵每 15 分钟跑一次，防抖 ≥ 巡检周期才不漏不重）
     - slack-log.md 记录 ts（消息时间戳），便于后续 reply 线程化

@@ -16,12 +16,12 @@ artifacts:
   requirement_baseline:        # S1
     node: S1
     schema: schemas/requirement_baseline.json
-    acceptance: { mode: auto, on_fail: S1 }
+    acceptance: { mode: auto, on_fail: S1 }, max_retries: 3
 
   tech_doc:                    # S2（simple 仍产方案，只是不等人）
     node: S2
     schema: schemas/tech_doc.json
-    acceptance: { mode: auto, on_fail: S2 }
+    acceptance: { mode: auto, on_fail: S2 }, max_retries: 3
 
   doc_self_review:             # S3：AI 审兜底
     node: S3
@@ -40,7 +40,7 @@ artifacts:
 
   code_change:                 # S5
     node: S5
-    acceptance: { mode: auto, checks: [build, unit_test], on_fail: S5 }
+    acceptance: { mode: auto, checks: [build, unit_test], on_fail: S5 }, max_retries: 3
 
   code_self_review:            # S6：AI 审兜底
     node: S6
@@ -55,7 +55,7 @@ artifacts:
 
   pr_registration:             # S7
     node: S7
-    acceptance: { mode: auto, checks: [pr_created], on_fail: S7 }
+    acceptance: { mode: auto, checks: [pr_created], on_fail: S7 }, max_retries: 3
 
   review_snapshot:             # S8
     node: S8
@@ -72,11 +72,11 @@ artifacts:
 
   update_record:               # S10
     node: S10
-    acceptance: { mode: auto, checks: [commit_pushed, comments_replied], on_fail: S10 }
+    acceptance: { mode: auto, checks: [commit_pushed, comments_replied], on_fail: S10 }, max_retries: 3
 
   final_check_report:          # S11
     node: S11
-    acceptance: { mode: auto, checks: [pr_approved_or_no_reviewers] }
+    acceptance: { mode: auto, checks: [pr_approved_or_no_reviewers]   # 无 reviewer 场景视为可过（个人仓库） }
 
   completion_notice:           # S12
     node: S12

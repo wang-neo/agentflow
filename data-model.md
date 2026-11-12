@@ -28,3 +28,10 @@
 #   "results_json": { "unit_test": "pass 46/46", "build": "pass" } }
 
 # 下游消费记录：workflow_state.json 中 consumed_artifact_version
+
+# v6 新增事件类型（artifacts.jsonl 同格式追加）
+# {"type":"node_skipped","node":"S4","task_id":"...","reason":"workflow:simple"}
+# {"type":"gate_sla_nudge","gate_id":"...","nudged_at":"..."}            # SLA 到期提醒
+# {"type":"task_stale","task_id":"...","marked_at":"..."}                 # waiting_stale
+# {"type":"judge_worktree_released","worktree":"af-s6-judge","at":"..."}  # Judge 清理留痕
+# {"type":"comment_batch","batch_size":6,"remaining":4,"task_id":"..."}   # S10 批处理

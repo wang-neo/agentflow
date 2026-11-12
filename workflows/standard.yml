@@ -16,12 +16,12 @@ artifacts:
   requirement_baseline:        # S1 需求分析
     node: S1
     schema: schemas/requirement_baseline.json
-    acceptance: { mode: auto, on_fail: S1 }
+    acceptance: { mode: auto, on_fail: S1 }, max_retries: 3
 
   tech_doc:                    # S2 技术文档
     node: S2
     schema: schemas/tech_doc.json
-    acceptance: { mode: auto, on_fail: S2 }
+    acceptance: { mode: auto, on_fail: S2 }, max_retries: 3
 
   doc_self_review:             # S3 文档自审
     node: S3
@@ -40,13 +40,13 @@ artifacts:
       mode: manual
       approvers: ["@Neo"]
       notify: slack
-      sla: 24h
+      sla: 24h          # 到期提醒一次；再 24h 未决标记 waiting_stale（不失败）
       on_reject: S1
       require_artifact: [tech_doc, doc_self_review]
 
   code_change:                 # S5 编码
     node: S5
-    acceptance: { mode: auto, checks: [build, unit_test], on_fail: S5 }
+    acceptance: { mode: auto, checks: [build, unit_test], on_fail: S5 }, max_retries: 3
 
   code_self_review:            # S6 代码自审
     node: S6

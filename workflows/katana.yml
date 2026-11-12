@@ -1,6 +1,6 @@
 # katana — 团队协作流程（Slack 深度集成）
 # 面向 katana-server 团队仓库：PR 建好后主动 @ 审核人；review 闭环全程 Slack 通知。
-# 前置：slack.notify 配置需要真实 webhook（当前占位实现，接入后自动生效）。
+# 前置：Slack 以用户身份发送，配置见 ~/.agentflow/slack.yml（SLACK_USER_TOKEN + SLACK_CHANNEL_ID，缺省自动降级占位）。
 
 workflow: katana_team_review
 version: 2
@@ -30,12 +30,12 @@ artifacts:
   requirement_baseline:        # S1
     node: S1
     schema: schemas/requirement_baseline.json
-    acceptance: { mode: auto, on_fail: S1 }
+    acceptance: { mode: auto, on_fail: S1 }, max_retries: 3
 
   tech_doc:                    # S2
     node: S2
     schema: schemas/tech_doc.json
-    acceptance: { mode: auto, on_fail: S2 }
+    acceptance: { mode: auto, on_fail: S2 }, max_retries: 3
 
   doc_self_review:             # S3
     node: S3
@@ -55,13 +55,13 @@ artifacts:
       mode: manual
       approvers: ["@Neo"]
       notify: slack                     # 审批请求也发 Slack（含产物路径）
-      sla: 24h
+      sla: 24h          # 到期提醒一次；再 24h 未决标记 waiting_stale（不失败）
       on_reject: S1
       require_artifact: [tech_doc, doc_self_review]
 
   code_change:                 # S5
     node: S5
-    acceptance: { mode: auto, checks: [build, unit_test], on_fail: S5 }
+    acceptance: { mode: auto, checks: [build, unit_test], on_fail: S5 }, max_retries: 3
 
   code_self_review:            # S6
     node: S6
@@ -80,6 +80,7 @@ artifacts:
       mode: auto
       checks: [pr_created, slack_mention_sent]   # @ 审核人消息发送成功才算过
       on_fail: S7
+      max_retries: 3                             # 同一原因 3 次后升级问人
 
   review_snapshot:             # S8
     node: S8

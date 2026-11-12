@@ -2,9 +2,10 @@
 
 ## 环境准备（按顺序执行）
 
-1. **规则库就位**：
-   - 若 `~/.agentflow` 不存在：`git clone https://github.com/wang-neo/agentflow.git ~/.agentflow`
-   - 已存在：`git -C ~/.agentflow pull -q`（保持最新）
+1. **规则库就位**（离线容错：网络失败不阻塞，用本地版本继续并提示）：
+   - 若 `~/.agentflow` 不存在：`git clone https://github.com/wang-neo/agentflow.git ~/.agentflow || echo "clone 失败：请检查网络，或手动放置规则库"`
+   - 已存在：`git -C ~/.agentflow pull -q --no-rebase 2>/dev/null || echo "（离线：使用本地规则库版本）"`
+   - 两者皆失败且无本地库 → 明确报错停止，不要凭记忆编造规则
 2. **读取工作指南**：`cat ~/.agentflow/COORDINATOR.md` —— 这是你的完整工作指南（S1–S13 流水线、三模式验收 auto/manual/ai_judge、记账格式、merge 铁律），严格按它执行。
 3. **加载编排能力**：`orca skills get orchestration`
 
