@@ -53,10 +53,10 @@ accepted 后下游才可消费；记录 consumed_artifact_version。
   同样规则适用于所有等用户的节点（S12 完成通知也列 PR URL+worktree+报告路径）
 - **S5 编码**（auto: build+unit_test）：worker 先写回归测试（红）再实现（绿），commit 不 push
 - **S6 代码自审**（ai_judge, rubrics/code_review.md, 0.85）：Judge 只读 diff+测试；fail→回 S5；**Judge 完成且记账落盘后，立即删除其 worktree（`orca worktree rm --force`）防泄漏**；判定结果已含哈希与证据，worktree 可弃
-- **S7 建 PR+Slack 登记**（auto: pr_created+slack_sent[katana 加 slack_mention_sent]）：push 分支、gh pr create、发 Slack（按 slack.yml：真实或占位）；同一原因失败重试 ≤3 次后问用户
+- **S7 建 PR+Slack 登记**（auto: pr_created+slack_sent[katana 加 slack_mention_sent]）：push 分支、gh pr create、发 Slack（按 slack.yml：真实或占位）；**真发送成功后把消息 ts 写入 ~/.agentflow/.sentinel-state.json 的 prs.<N>.slack_ts（哨兵将盯此线程的回复）**；同一原因失败重试 ≤3 次后问用户
 - **S8 监听**（auto）：结束回合，等哨兵 automation 转发（哨兵找不到协调者时会把事件升级发 Slack——见 slack.yml 模板；你在启动协议里已自注册，正常不会失联）
 - **S8R 无 comment 提醒**（auto, cooldown/max 按 workflow）：哨兵报超时 → Slack 提醒（登记 reminder_record）
-- **S9 评论分类**（ai_judge, rubrics/comment_classification.md, 0.80）：Judge 对每条 comment 输出 must_fix/optional/no_fix/needs_clarification + 证据（**证据引用 commit SHA 而非行号**，行号随 diff 漂移）；Judge worktree 用完即删
+- **S9 评论分类**（被哨兵的 SLACK_ACTIVITY 或 NEW_COMMENTS 唤醒后：先 `gh pr view` 读 GitHub 真实 comments——Slack 回复只是信号，内容以 GitHub 为准；ai_judge, rubrics/comment_classification.md, 0.80）：Judge 对每条 comment 输出 must_fix/optional/no_fix/needs_clarification + 证据（**证据引用 commit SHA 而非行号**，行号随 diff 漂移）；Judge worktree 用完即删
 - **S10 修改+回复+Slack**（auto: commit_pushed+comments_replied+slack_sent）：
   must_fix/采纳的 optional → dev worker 修复 → push → PR comment 回复 `Fixed in <commit>: <简述>`；
   no_fix → 回复技术理由；needs_clarification → 回复提问；

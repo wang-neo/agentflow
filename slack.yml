@@ -11,6 +11,7 @@
 # 运行时配置（secret 不入库）：
 #   export SLACK_USER_TOKEN=xoxp-xxxx        # 用户令牌
 #   export SLACK_CHANNEL_ID=C0123ABCDEF      # 目标频道 ID（右键频道→查看频道详情）
+# 线程监控额外 scope：channels:history（公开频道）或 groups:history（私有频道）——哨兵读线程回复用
 # 可写入 ~/.agentflow/.env（gitignore 保护），协调者启动时读取。
 
 slack:
@@ -52,3 +53,5 @@ slack:
     - token/channel 未配置 → 占位模式，就绪简报提示缺什么
     - 防抖窗口与哨兵巡检周期对齐：15 分钟（哨兵每 15 分钟跑一次，防抖 ≥ 巡检周期才不漏不重）
     - slack-log.md 记录 ts（消息时间戳），便于后续 reply 线程化
+    - **PR 消息的 ts 必须同步写入 ~/.agentflow/.sentinel-state.json 的 prs.<N>.slack_ts**（哨兵靠它盯线程回复）
+    - 后续同任务消息（updated/approved）优先用 chat.postMessage 的 thread_ts 参数回复到原线程——把讨论聚在一个线程里
